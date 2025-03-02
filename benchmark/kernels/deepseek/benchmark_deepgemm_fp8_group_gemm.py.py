@@ -4,7 +4,7 @@ import deep_gemm
 import torch
 import triton
 import triton.language as tl
-from deep_gemm import calc_diff, ceil_div, get_col_major_tma_aligned_tensor
+from deep_gemm import calc_diff, get_col_major_tma_aligned_tensor
 
 # Import shared functionality from the regular GEMM benchmark
 from sglang.benchmark.kernels.deepseek.benchmark_deepgemm_fp8_gemm import (
@@ -78,7 +78,9 @@ def construct_grouped_and_flat_fp8(
     return x_fp8_grouped, y_fp8_grouped, x_fp8_flat, y_fp8_flat, out, ref_out
 
 
-# Reference: https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html
+# Since we don't have a group gemm kernel in SGLang/vLLM, we implemented a
+# custom kernel based on the Triton tutorial.
+# https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html
 @triton.jit
 def fp8_gemm_group_triton_kernel(
     # Pointers to matrices
@@ -252,6 +254,16 @@ def fp8_gemm_group_triton(a_tuple, b_tuple, num_groups):
     return c
 
 
+def fp8_gemm_group_deepgemm(x_fp8_grouped, y_fp8_grouped, out, m_indices):
+    deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
+        x_fp8_grouped,
+        y_fp8_grouped,
+        out,
+        m_indices,
+    )
+    return out
+
+
 def get_weight_shapes(tp_size):
     # cannot TP
     total = [
@@ -312,9 +324,9 @@ def calculate_diff(m: int, n: int, k: int, num_groups: int):
         m_indices.unsqueeze(-1).expand(num_groups, m_per_group).contiguous().view(-1)
     )
 
-    deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
-        (x_fp8_grouped[0].clone(), x_fp8_grouped[1].clone()),
-        (y_fp8_grouped[0].clone(), y_fp8_grouped[1].clone()),
+    fp8_gemm_group_deepgemm(
+        x_fp8_grouped,
+        y_fp8_grouped,
         out_deepgemm,
         m_indices,
     )
@@ -395,7 +407,7 @@ def get_benchmark(tp_size):
 
         if provider == "deepgemm":
             ms, min_ms, max_ms = triton.testing.do_bench(
-                lambda: deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
+                lambda: fp8_gemm_group_deepgemm(
                     x_fp8_grouped,
                     y_fp8_grouped,
                     out,
