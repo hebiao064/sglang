@@ -350,6 +350,7 @@ class TokenizerManager:
     ):
         """Tokenize one request."""
         # Start timing tokenization
+
         tokenization_start = time.time()
 
         # Tokenize
@@ -1033,7 +1034,6 @@ class TokenizerManager:
         token_logprobs_idx: List[int],
         decode_to_text: bool,
     ):
-        print(f"Stefan detokenize_top_logprobs_tokens start: {decode_to_text}")
         # TODO: The current implementation only batches the detokenization for top-k tokens per single position.
         # We should batch all top-k tokens in all positions.
         ret = []

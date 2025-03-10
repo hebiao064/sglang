@@ -17,8 +17,6 @@ import time
 from dataclasses import dataclass
 from typing import Dict, Union
 
-from prometheus_client import Counter, Histogram
-
 
 @dataclass
 class SchedulerStats:
@@ -35,7 +33,7 @@ class SchedulerMetricsCollector:
 
     def __init__(self, labels: Dict[str, str]) -> None:
         # We need to import prometheus_client after setting the env variable `PROMETHEUS_MULTIPROC_DIR`
-        from prometheus_client import Gauge
+        from prometheus_client import Gauge, Histogram
 
         self.labels = labels
         self.last_log_time = time.time()
@@ -135,6 +133,7 @@ class SchedulerMetricsCollector:
 class TokenizerMetricsCollector:
     def __init__(self, labels: Dict[str, str]) -> None:
         # We need to import prometheus_client after setting the env variable `PROMETHEUS_MULTIPROC_DIR`
+        from prometheus_client import Counter, Histogram
 
         self.labels = labels
 
