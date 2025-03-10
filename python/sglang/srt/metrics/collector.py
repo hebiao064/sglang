@@ -17,6 +17,8 @@ import time
 from dataclasses import dataclass
 from typing import Dict, Union
 
+from prometheus_client import Counter, Histogram
+
 
 @dataclass
 class SchedulerStats:
@@ -87,6 +89,30 @@ class SchedulerMetricsCollector:
             multiprocess_mode="mostrecent",
         )
 
+        self.histogram_request_queue_latency = Histogram(
+            name="sglang:request_queue_latency_seconds",
+            documentation="Histogram of time requests spend in queue before processing",
+            labelnames=labels.keys(),
+            buckets=[
+                0.001,
+                0.002,
+                0.005,
+                0.010,
+                0.020,
+                0.050,
+                0.100,
+                0.200,
+                0.500,
+                1.000,
+                2.000,
+                5.000,
+                10.000,
+                20.000,
+                30.000,
+                60.000,
+            ],
+        )
+
     def _log_gauge(self, gauge, data: Union[int, float]) -> None:
         # Convenience function for logging to gauge.
         gauge.labels(**self.labels).set(data)
@@ -101,11 +127,14 @@ class SchedulerMetricsCollector:
         self._log_gauge(self.spec_accept_length, stats.spec_accept_length)
         self.last_log_time = time.time()
 
+    def observe_request_queue_latency(self, latency: float):
+        """Record how long a request waited in queue before processing."""
+        self.histogram_request_queue_latency.labels(**self.labels).observe(latency)
+
 
 class TokenizerMetricsCollector:
     def __init__(self, labels: Dict[str, str]) -> None:
         # We need to import prometheus_client after setting the env variable `PROMETHEUS_MULTIPROC_DIR`
-        from prometheus_client import Counter, Histogram
 
         self.labels = labels
 
@@ -244,6 +273,54 @@ class TokenizerMetricsCollector:
             ],
         )
 
+        self.histogram_tokenization_latency = Histogram(
+            name="sglang:tokenization_latency_seconds",
+            documentation="Histogram of tokenization latency in seconds",
+            labelnames=labels.keys(),
+            buckets=[
+                0.001,
+                0.002,
+                0.005,
+                0.010,
+                0.020,
+                0.030,
+                0.040,
+                0.050,
+                0.075,
+                0.100,
+                0.150,
+                0.200,
+                0.300,
+                0.400,
+                0.500,
+                1.000,
+            ],
+        )
+
+        self.histogram_detokenization_latency = Histogram(
+            name="sglang:detokenization_latency_seconds",
+            documentation="Histogram of detokenization latency in seconds",
+            labelnames=labels.keys(),
+            buckets=[
+                0.001,
+                0.002,
+                0.005,
+                0.010,
+                0.020,
+                0.030,
+                0.040,
+                0.050,
+                0.075,
+                0.100,
+                0.150,
+                0.200,
+                0.300,
+                0.400,
+                0.500,
+                1.000,
+            ],
+        )
+
     def _log_histogram(self, histogram, data: Union[int, float]) -> None:
         histogram.labels(**self.labels).observe(data)
 
@@ -279,3 +356,9 @@ class TokenizerMetricsCollector:
             if adjusted_interval <= bound:
                 his._buckets[i].inc(num_new_tokens)
                 break
+
+    def observe_tokenization_latency(self, latency: float):
+        self.histogram_tokenization_latency.labels(**self.labels).observe(latency)
+
+    def observe_detokenization_latency(self, latency: float):
+        self.histogram_detokenization_latency.labels(**self.labels).observe(latency)

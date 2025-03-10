@@ -349,6 +349,9 @@ class TokenizerManager:
         obj: Union[GenerateReqInput, EmbeddingReqInput],
     ):
         """Tokenize one request."""
+        # Start timing tokenization
+        tokenization_start = time.time()
+
         # Tokenize
         input_embeds = None
         input_text = obj.text
@@ -371,6 +374,10 @@ class TokenizerManager:
                     "the engine with skip_tokenizer_init=False."
                 )
             input_ids = self.tokenizer.encode(input_text)
+
+        if self.enable_metrics:
+            tokenization_latency = time.time() - tokenization_start
+            self.metrics_collector.observe_tokenization_latency(tokenization_latency)
 
         image_inputs: Dict = await self.image_processor.process_images_async(
             obj.image_data, input_text or input_ids, obj, self.max_req_input_len
@@ -449,6 +456,7 @@ class TokenizerManager:
         tokenized_obj: Union[TokenizedGenerateReqInput, TokenizedEmbeddingReqInput],
         created_time: Optional[float] = None,
     ):
+
         state = ReqState([], False, asyncio.Event(), obj, created_time=created_time)
         self.rid_to_state[obj.rid] = state
         self.send_to_scheduler.send_pyobj(tokenized_obj)
@@ -1025,6 +1033,7 @@ class TokenizerManager:
         token_logprobs_idx: List[int],
         decode_to_text: bool,
     ):
+        print(f"Stefan detokenize_top_logprobs_tokens start: {decode_to_text}")
         # TODO: The current implementation only batches the detokenization for top-k tokens per single position.
         # We should batch all top-k tokens in all positions.
         ret = []
