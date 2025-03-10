@@ -486,7 +486,13 @@ class Scheduler(SchedulerOutputProcessorMixin):
 
             batch = self.get_next_batch_to_run()
             self.cur_batch = batch
-
+            # Record queue latency for each request
+            if self.enable_metrics:
+                current_time = time.time()
+                for req in batch.reqs:
+                    if hasattr(req, "arrival_time"):
+                        queue_latency = current_time - req.arrival_time
+                        self.metrics_collector.observe_queue_latency(queue_latency)
             if batch:
                 result = self.run_batch(batch)
                 self.process_batch_result(batch, result)
@@ -590,6 +596,13 @@ class Scheduler(SchedulerOutputProcessorMixin):
 
     def process_input_requests(self, recv_reqs: List):
         for recv_req in recv_reqs:
+            # Record request arrival time
+            if isinstance(
+                recv_req, (TokenizedGenerateReqInput, TokenizedEmbeddingReqInput)
+            ):
+                arrival_time = time.time()
+                recv_req.arrival_time = arrival_time
+
             # If it is a health check generation request and there are running requests, ignore it.
             if is_health_check_generate_req(recv_req) and (
                 self.chunked_req is not None or not self.running_batch.is_empty()
@@ -645,6 +658,8 @@ class Scheduler(SchedulerOutputProcessorMixin):
                 return_hidden_states=recv_req.return_hidden_states,
                 eos_token_ids=self.model_config.hf_eos_token_id,
             )
+            # Set the arrival time from the recv_req
+            req.arrival_time = getattr(recv_req, "arrival_time", None)
             req.tokenizer = self.tokenizer
 
             if (
@@ -770,6 +785,8 @@ class Scheduler(SchedulerOutputProcessorMixin):
             recv_req.input_ids,
             recv_req.sampling_params,
         )
+        # Set the arrival time from the recv_req
+        req.arrival_time = getattr(recv_req, "arrival_time", None)
         req.tokenizer = self.tokenizer
 
         # Handle multimodal inputs
@@ -1045,6 +1062,10 @@ class Scheduler(SchedulerOutputProcessorMixin):
 
         # Get requests from the waiting queue to a new prefill batch
         for req in self.waiting_queue:
+            if req.arrival_time is not None:
+                queue_latency = time.time() - req.arrival_time
+                self.metrics_collector.observe_request_queue_latency(queue_latency)
+
             if (
                 self.lora_paths
                 and len(

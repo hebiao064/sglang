@@ -266,6 +266,8 @@ class Req:
         self.fill_ids = None
         self.session_id = session_id
         self.input_embeds = input_embeds
+        # Record request arrived time in queue
+        self.arrival_time = None
 
         # Sampling info
         if isinstance(sampling_params.custom_params, dict):
