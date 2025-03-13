@@ -1088,8 +1088,9 @@ class Scheduler(SchedulerOutputProcessorMixin):
                 None if prefix_computed else self.tree_cache,
                 self.enable_hierarchical_cache,
             )
-            latency = time.time() - start_time
-            self.metrics_collector.observe_prefix_cache_lookup_latency(latency)
+            if self.enable_metrics:
+                latency = time.time() - start_time
+                self.metrics_collector.observe_prefix_cache_lookup_latency(latency)
 
             res = adder.add_one_req(
                 req, self.chunked_req, self.enable_hierarchical_cache
