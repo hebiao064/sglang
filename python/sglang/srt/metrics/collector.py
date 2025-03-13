@@ -102,12 +102,24 @@ class SchedulerMetricsCollector:
                 0.200,
                 0.500,
                 1.000,
-                2.000,
-                5.000,
-                10.000,
-                20.000,
-                30.000,
-                60.000,
+            ],
+        )
+
+        self.prefix_cache_lookup_latency = Histogram(
+            name="sglang:prefix_cache_lookup_latency_seconds",
+            documentation="Histogram of time requests spend in prefix cache lookup",
+            labelnames=labels.keys(),
+            buckets=[
+                0.001,
+                0.002,
+                0.005,
+                0.010,
+                0.020,
+                0.050,
+                0.100,
+                0.200,
+                0.500,
+                1.000,
             ],
         )
 
@@ -128,6 +140,10 @@ class SchedulerMetricsCollector:
     def observe_request_queue_latency(self, latency: float):
         """Record how long a request waited in queue before processing."""
         self.histogram_request_queue_latency.labels(**self.labels).observe(latency)
+
+    def observe_prefix_cache_lookup_latency(self, latency: float):
+        """Record how long a request spent in prefix cache lookup."""
+        self.prefix_cache_lookup_latency.labels(**self.labels).observe(latency)
 
 
 class TokenizerMetricsCollector:

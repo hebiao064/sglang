@@ -1082,10 +1082,14 @@ class Scheduler(SchedulerOutputProcessorMixin):
                 self.running_batch.batch_is_full = True
                 break
 
+            # Lookup Radix Cache
+            start_time = time.time()
             req.init_next_round_input(
                 None if prefix_computed else self.tree_cache,
                 self.enable_hierarchical_cache,
             )
+            latency = time.time() - start_time
+            self.metrics_collector.observe_prefix_cache_lookup_latency(latency)
 
             res = adder.add_one_req(
                 req, self.chunked_req, self.enable_hierarchical_cache
