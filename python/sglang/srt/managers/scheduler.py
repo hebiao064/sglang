@@ -482,12 +482,15 @@ class Scheduler(SchedulerOutputProcessorMixin):
     def event_loop_normal(self):
         """A normal scheduler loop."""
         while True:
+            # accumulat requests until no requests are received
             recv_reqs = self.recv_requests()
+            
+            # preprocess requests by setup Req objects
             self.process_input_requests(recv_reqs)
 
             batch = self.get_next_batch_to_run()
             self.cur_batch = batch
-
+           
             if batch:
                 result = self.run_batch(batch)
                 self.process_batch_result(batch, result)
@@ -505,6 +508,8 @@ class Scheduler(SchedulerOutputProcessorMixin):
 
         while True:
             recv_reqs = self.recv_requests()
+            
+            # 
             self.process_input_requests(recv_reqs)
 
             batch = self.get_next_batch_to_run()
@@ -591,6 +596,8 @@ class Scheduler(SchedulerOutputProcessorMixin):
 
     def process_input_requests(self, recv_reqs: List):
         for recv_req in recv_reqs:
+            # Record request arrival time
+
             # If it is a health check generation request and there are running requests, ignore it.
             if is_health_check_generate_req(recv_req) and (
                 self.chunked_req is not None or not self.running_batch.is_empty()
@@ -646,6 +653,7 @@ class Scheduler(SchedulerOutputProcessorMixin):
                 return_hidden_states=recv_req.return_hidden_states,
                 eos_token_ids=self.model_config.hf_eos_token_id,
             )
+            req.arrival_time = time.time()
             req.tokenizer = self.tokenizer
 
             if (
@@ -829,7 +837,8 @@ class Scheduler(SchedulerOutputProcessorMixin):
         self._largest_prefill_len = max(
             self._largest_prefill_len, adder.log_input_tokens
         )
-
+        queue_latency = time.time() - self.last_prefill_stats_tic
+        
         f = (
             f"Prefill batch. "
             f"#new-seq: {len(can_run_list)}, "
@@ -838,6 +847,7 @@ class Scheduler(SchedulerOutputProcessorMixin):
             f"token usage: {num_used / self.max_total_num_tokens:.2f}, "
             f"#running-req: {running_bs}, "
             f"#queue-req: {len(self.waiting_queue)}, "
+            f"#queue-latency: {queue_latency:.2f}s"
         )
         logger.info(f)
 
@@ -850,7 +860,9 @@ class Scheduler(SchedulerOutputProcessorMixin):
             self.stats.token_usage = round(num_used / self.max_total_num_tokens, 2)
             self.stats.num_queue_reqs = len(self.waiting_queue)
             self.stats.cache_hit_rate = cache_hit_rate
+            self.stats.request_queue_latency = queue_latency
             self.metrics_collector.log_stats(self.stats)
+            
 
     def log_decode_stats(self):
         gap_latency = time.time() - self.last_decode_stats_tic
@@ -1062,10 +1074,14 @@ class Scheduler(SchedulerOutputProcessorMixin):
                 self.running_batch.batch_is_full = True
                 break
 
+            # Lookup Radix Cache
+            start_time = time.time()
+            req.radix_cache_lookup_time_start = start_time
             req.init_next_round_input(
                 None if prefix_computed else self.tree_cache,
                 self.enable_hierarchical_cache,
             )
+            req.radix_cache_lookup_time_end = time.time()
 
             res = adder.add_one_req(
                 req, self.chunked_req, self.enable_hierarchical_cache

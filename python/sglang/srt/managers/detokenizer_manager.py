@@ -14,10 +14,10 @@
 """DetokenizerManager is a process that detokenizes the token ids."""
 
 import dataclasses
-import json
 import logging
 import os
 import signal
+import time
 from collections import OrderedDict
 from typing import Dict, List, Union
 
@@ -101,6 +101,16 @@ class DetokenizerManager:
             ]
         )
 
+        # Initialize metrics collector if metrics are enabled
+        if server_args.enable_metrics:
+            from sglang.srt.metrics.collector import TokenizerMetricsCollector
+
+            self.metrics_collector = TokenizerMetricsCollector(
+                labels={
+                    "model_name": server_args.served_model_name,
+                },
+            )
+
     def event_loop(self):
         """The event loop that handles requests"""
         while True:
@@ -137,6 +147,7 @@ class DetokenizerManager:
 
     def handle_batch_token_id_out(self, recv_obj: BatchTokenIDOut):
         bs = len(recv_obj.rids)
+        detokenization_start = time.time()
 
         # Initialize decode status
         read_ids, surr_ids = [], []
@@ -174,6 +185,13 @@ class DetokenizerManager:
             skip_special_tokens=recv_obj.skip_special_tokens[0],
             spaces_between_special_tokens=recv_obj.spaces_between_special_tokens[0],
         )
+
+        # Record detokenization time if metrics are enabled
+        if hasattr(self, "metrics_collector"):
+            detokenization_latency = time.time() - detokenization_start
+            self.metrics_collector.observe_detokenization_latency(
+                detokenization_latency
+            )
 
         # Incremental decoding
         output_strs = []
