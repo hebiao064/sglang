@@ -27,6 +27,8 @@ class SchedulerStats:
     num_queue_reqs: int = 0
     cache_hit_rate: float = 0.0
     spec_accept_length: float = 0.0
+    request_queue_latency: float = 0.0
+    prefix_cache_lookup_latency: float = 0.0
 
 
 class SchedulerMetricsCollector:
@@ -136,15 +138,6 @@ class SchedulerMetricsCollector:
         self._log_gauge(self.cache_hit_rate, stats.cache_hit_rate)
         self._log_gauge(self.spec_accept_length, stats.spec_accept_length)
         self.last_log_time = time.time()
-
-    def observe_request_queue_latency(self, latency: float):
-        """Record how long a request waited in queue before processing."""
-        self.histogram_request_queue_latency.labels(**self.labels).observe(latency)
-
-    def observe_prefix_cache_lookup_latency(self, latency: float):
-        """Record how long a request spent in prefix cache lookup."""
-        self.prefix_cache_lookup_latency.labels(**self.labels).observe(latency)
-
 
 class TokenizerMetricsCollector:
     def __init__(self, labels: Dict[str, str]) -> None:
@@ -302,13 +295,7 @@ class TokenizerMetricsCollector:
                 0.040,
                 0.050,
                 0.075,
-                0.100,
-                0.150,
-                0.200,
-                0.300,
-                0.400,
-                0.500,
-                1.000,
+                0.100
             ],
         )
 
@@ -326,13 +313,7 @@ class TokenizerMetricsCollector:
                 0.040,
                 0.050,
                 0.075,
-                0.100,
-                0.150,
-                0.200,
-                0.300,
-                0.400,
-                0.500,
-                1.000,
+                0.100
             ],
         )
 

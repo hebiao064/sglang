@@ -266,8 +266,12 @@ class Req:
         self.fill_ids = None
         self.session_id = session_id
         self.input_embeds = input_embeds
-        # Record request arrived time in queue
-        self.arrival_time = None
+        
+        # Record Latency Breakdown
+        self.queue_time_start = None
+        self.queue_time_end = None
+        self.radix_cache_lookup_time_start = None
+        self.radix_cache_lookup_time_end = None
 
         # Sampling info
         if isinstance(sampling_params.custom_params, dict):
