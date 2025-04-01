@@ -84,7 +84,6 @@ class FlashAttentionBackend(AttentionBackend):
         # Precompute int32 version of sequence lengths
         batch_size = len(seqlens_in_batch)
         device = seqlens_in_batch.device
-        # torch.distributed.breakpoint()
         if forward_batch.forward_mode == ForwardMode.DECODE:
             if self.skip_prefill:
                 print(f"Decode step_id: {self.step_id}")
@@ -125,7 +124,7 @@ class FlashAttentionBackend(AttentionBackend):
                     ] = cache_loc[
                         real_bsz_start_idx:real_bsz_end_idx, : (self.step_id + 1)
                     ]
-                
+
                 print(metadata)
             else:
                 print(f"forward batch is {forward_batch}")
@@ -169,7 +168,6 @@ class FlashAttentionBackend(AttentionBackend):
                 torch.cumsum(aug_seq_lens, dim=0, dtype=torch.int32), (1, 0)
             )
 
-            torch.distributed.breakpoint()
             for idx, single_seq_len in enumerate(aug_seq_lens):
                 metadata.page_table[
                     idx * draft_token_num : (idx + 1) * draft_token_num, :single_seq_len
@@ -180,11 +178,10 @@ class FlashAttentionBackend(AttentionBackend):
                 ].view(
                     draft_token_num, -1
                 )
-            # torch.distributed.breakpoint()
             metadata.max_seq_len_q = 1
             print(metadata)
-        else: # Normal Extend / Draft Extend
-            
+        else:  # Normal Extend / Draft Extend
+
             metadata.cache_seqlens_int32 = seqlens_in_batch.to(torch.int32)
             metadata.cu_seqlens_k = torch.nn.functional.pad(
                 torch.cumsum(seqlens_in_batch, dim=0, dtype=torch.int32), (1, 0)
@@ -474,7 +471,7 @@ class FlashAttentionBackend(AttentionBackend):
                 0, self.max_context_len, self.page_size, device=self.device
             ),
         }
-        
+
         print(f"num_draft_tokens: {self.num_draft_tokens}")
 
         self.target_verify_metadata = {
@@ -505,22 +502,18 @@ class FlashAttentionBackend(AttentionBackend):
             metadata.cache_seqlens_int32 = seq_lens_with_decode.repeat_interleave(
                 self.topk
             ).to(torch.int32)
-            
+
             metadata.cu_seqlens_k = torch.nn.functional.pad(
-                torch.cumsum(
-                    metadata.cache_seqlens_int32, dim=0, dtype=torch.int32
-                ),
+                torch.cumsum(metadata.cache_seqlens_int32, dim=0, dtype=torch.int32),
                 (1, 0),
             )
-            metadata.max_seq_len_k = seq_lens.max().item() + (
-                self.step_id + 1
-            )
+            metadata.max_seq_len_k = seq_lens.max().item() + (self.step_id + 1)
             metadata.page_table = self.decode_cuda_graph_metadata["page_table_decode"][
                 req_pool_indices, :
             ]
             metadata.page_table = metadata.page_table.repeat_interleave(
                 self.topk, dim=0
-            ) 
+            )
         elif forward_mode.is_target_verify():
             draft_token_num = spec_info.draft_token_num
 
@@ -536,9 +529,7 @@ class FlashAttentionBackend(AttentionBackend):
                 torch.cumsum(metadata.cache_seqlens_int32, dim=0, dtype=torch.int32),
                 (1, 0),
             )
-            metadata.max_seq_len_k = (
-                seq_lens.max().item() + draft_token_num
-            )
+            metadata.max_seq_len_k = seq_lens.max().item() + draft_token_num
             metadata.page_table = self.target_verify_metadata["page_table"][
                 req_pool_indices, :
             ]
@@ -605,11 +596,8 @@ class FlashAttentionBackend(AttentionBackend):
         if draft_decode:
 
             print(f"Replay step_id: {self.step_id}")
-            torch.distributed.breakpoint()
             max_len = seq_lens_cpu[:bs].max().item()
-            metadata.max_seq_len_k = max_len + (
-                self.step_id + 1
-            )
+            metadata.max_seq_len_k = max_len + (self.step_id + 1)
             metadata.cu_seqlens_q = torch.arange(
                 0, bs * self.topk + 1, dtype=torch.int32, device=device
             )
@@ -618,9 +606,7 @@ class FlashAttentionBackend(AttentionBackend):
                 (seq_lens_with_decode).repeat_interleave(self.topk).to(torch.int32)
             )
             metadata.cu_seqlens_k = torch.nn.functional.pad(
-                torch.cumsum(
-                    metadata.cache_seqlens_int32, dim=0, dtype=torch.int32
-                ),
+                torch.cumsum(metadata.cache_seqlens_int32, dim=0, dtype=torch.int32),
                 (1, 0),
             )
             metadata.page_table = self.req_to_token[
@@ -637,9 +623,7 @@ class FlashAttentionBackend(AttentionBackend):
                 metadata.page_table[
                     real_bsz_start_idx:real_bsz_end_idx,
                     (single_seq_len - (self.step_id + 1)) : single_seq_len,
-                ] = cache_loc[
-                    real_bsz_start_idx:real_bsz_end_idx, : (self.step_id + 1)
-                ]
+                ] = cache_loc[real_bsz_start_idx:real_bsz_end_idx, : (self.step_id + 1)]
             print(metadata)
         elif forward_mode.is_target_verify():
             print(f"forward batch is {seq_lens}")
@@ -658,9 +642,7 @@ class FlashAttentionBackend(AttentionBackend):
                 torch.cumsum(metadata.cache_seqlens_int32, dim=0, dtype=torch.int32),
                 (1, 0),
             )
-            metadata.max_seq_len_k = (
-                seq_lens.max().item() + draft_token_num
-            )
+            metadata.max_seq_len_k = seq_lens.max().item() + draft_token_num
             metadata.page_table = self.req_to_token[
                 req_pool_indices, : metadata.max_seq_len_k
             ].repeat_interleave(draft_token_num, dim=0)
@@ -668,7 +650,6 @@ class FlashAttentionBackend(AttentionBackend):
                 torch.cumsum(aug_seq_lens, dim=0, dtype=torch.int32), (1, 0)
             )
             for idx, single_seq_len in enumerate(aug_seq_lens):
-                torch.distributed.breakpoint()
                 metadata.page_table[
                     idx * draft_token_num : (idx + 1) * draft_token_num, :single_seq_len
                 ] *= spec_info.custom_mask[
@@ -692,7 +673,9 @@ class FlashAttentionBackend(AttentionBackend):
                 torch.cumsum(seq_lens_in_batch, dim=0, dtype=torch.int32), (1, 0)
             )
 
-            max_seq_pages = (metadata.max_seq_len_k + self.page_size - 1) // self.page_size
+            max_seq_pages = (
+                metadata.max_seq_len_k + self.page_size - 1
+            ) // self.page_size
             page_indices = self.req_to_token[
                 :, self.decode_cuda_graph_metadata["strided_indices"][:max_seq_pages]
             ]
@@ -736,7 +719,9 @@ class FlashAttentionMultiStepBackend:
             self.attn_backends[i].init_cuda_graph_state(max_bs)
 
     def init_forward_metadata_capture_cuda_graph(
-        self, forward_batch: ForwardBatch, draft_decode: bool = False,
+        self,
+        forward_batch: ForwardBatch,
+        draft_decode: bool = False,
     ):
         assert forward_batch.spec_info is not None
         assert isinstance(forward_batch.spec_info, EagleDraftInput)
