@@ -498,7 +498,7 @@ class FlashAttentionBackend(AttentionBackend):
         metadata = FlashAttentionMetadata()
         device = seq_lens.device
         if draft_decode:
-            seq_lens_with_decode = seq_lens + spec_info.draft_token_num
+            seq_lens_with_decode = seq_lens + self.step_id + 1
             metadata.cache_seqlens_int32 = seq_lens_with_decode.repeat_interleave(
                 self.topk
             ).to(torch.int32)

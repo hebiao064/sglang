@@ -877,7 +877,7 @@ class ModelRunner:
                 FlashAttentionBackend,
             )
 
-            if self.server_args.speculative_algorithm in ["EAGLE", "EAGLE3"]:
+            if self.spec_algorithm.is_eagle():
                 assert self.server_args.speculative_num_draft_tokens > 0, (
                     "Speculative decoding is enabled, but no draft tokens are provided. "
                     "Please set --speculative-num-draft-tokens to a positive integer."
