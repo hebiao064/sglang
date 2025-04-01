@@ -182,6 +182,7 @@ class CudaGraphRunner:
         self.dp_size = model_runner.server_args.dp_size
 
         # Batch sizes to capture
+        # torch.distributed.breakpoint()
         self.capture_bs, self.compile_bs = get_batch_sizes_to_capture(model_runner)
         self.capture_forward_mode = ForwardMode.DECODE
         self.capture_hidden_mode = CaptureHiddenMode.NULL
@@ -215,6 +216,7 @@ class CudaGraphRunner:
         with torch.device("cuda"):
             self.input_ids = torch.zeros((self.max_num_token,), dtype=torch.int64)
             self.req_pool_indices = torch.zeros((self.max_bs,), dtype=torch.int32)
+            torch.distributed.breakpoint()
             self.seq_lens = torch.full(
                 (self.max_bs,), self.seq_len_fill_value, dtype=torch.int32
             )
@@ -469,7 +471,7 @@ class CudaGraphRunner:
 
     def replay_prepare(self, forward_batch: ForwardBatch):
         self.recapture_if_needed(forward_batch)
-
+        # torch.distributed.breakpoint()
         raw_bs = forward_batch.batch_size
         raw_num_token = raw_bs * self.num_tokens_per_bs
 
@@ -505,7 +507,7 @@ class CudaGraphRunner:
 
         if hasattr(forward_batch.spec_info, "hidden_states"):
             self.hidden_states[:raw_num_token] = forward_batch.spec_info.hidden_states
-
+        # torch.distributed.breakpoint()
         # Attention backend
         self.model_runner.attn_backend.init_forward_metadata_replay_cuda_graph(
             bs,
