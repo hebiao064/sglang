@@ -590,13 +590,15 @@ class FlashAttentionBackend(AttentionBackend):
         out_cache_loc: torch.Tensor = None,
     ):
         # """Initialize forward metadata for replaying CUDA graph."""
-        print(f"Replay forward mode: {forward_mode}")
         metadata = self.decode_cuda_graph_metadata[bs]
         device = seq_lens.device
+        seq_lens = seq_lens[:bs]
+        req_pool_indices = req_pool_indices[:bs]
+        seq_lens_cpu = seq_lens_cpu[:bs]
         if draft_decode:
 
             print(f"Replay step_id: {self.step_id}")
-            max_len = seq_lens_cpu[:bs].max().item()
+            max_len = seq_lens_cpu.max().item()
             metadata.max_seq_len_k = max_len + (self.step_id + 1)
             metadata.cu_seqlens_q = torch.arange(
                 0, bs * self.topk + 1, dtype=torch.int32, device=device
@@ -661,16 +663,16 @@ class FlashAttentionBackend(AttentionBackend):
                 )
 
             metadata.max_seq_len_q = 1
+            print(metadata)
         else:
             # For CPU operations
-            max_len = seq_lens_cpu[:bs].max().item()
+            max_len = seq_lens_cpu.max().item()
             metadata.max_seq_len_k = max_len
 
             # For GPU operations
-            seq_lens_in_batch = seq_lens[:bs]
-            metadata.cache_seqlens_int32 = seq_lens_in_batch.to(torch.int32)
+            metadata.cache_seqlens_int32 = seq_lens.to(torch.int32)
             metadata.cu_seqlens_k = torch.nn.functional.pad(
-                torch.cumsum(seq_lens_in_batch, dim=0, dtype=torch.int32), (1, 0)
+                torch.cumsum(seq_lens, dim=0, dtype=torch.int32), (1, 0)
             )
 
             max_seq_pages = (
@@ -679,7 +681,7 @@ class FlashAttentionBackend(AttentionBackend):
             page_indices = self.req_to_token[
                 :, self.decode_cuda_graph_metadata["strided_indices"][:max_seq_pages]
             ]
-            page_indices = page_indices[req_pool_indices[:bs]] // self.page_size
+            page_indices = page_indices[req_pool_indices] // self.page_size
             metadata.page_table[:, :max_seq_pages].copy_(page_indices)
             metadata.page_table[:, max_seq_pages:].fill_(0)
         self.forward_metadata = metadata
