@@ -475,6 +475,7 @@ class EAGLEWorker(TpModelWorker):
         return score_list, token_list, parents_list
 
     def verify(self, batch: ScheduleBatch, spec_info: EagleVerifyInput):
+        # torch.distributed.breakpoint()
         spec_info.prepare_for_verify(batch, self.page_size)
         batch.forward_mode = ForwardMode.TARGET_VERIFY
         batch.spec_info = spec_info
