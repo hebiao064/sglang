@@ -876,8 +876,19 @@ class ModelRunner:
             from sglang.srt.layers.attention.flashattention_backend import (
                 FlashAttentionBackend,
             )
-
-            self.attn_backend = FlashAttentionBackend(self)
+            if self.server_args.speculative_algorithm in ["EAGLE", "EAGLE3"]:
+                assert self.server_args.speculative_num_draft_tokens > 0, (
+                    "Speculative decoding is enabled, but no draft tokens are provided. "
+                    "Please set --speculative-num-draft-tokens to a positive integer."
+                )
+                print(f"Before Init num_draft_tokens: {self.server_args.speculative_num_draft_tokens}")
+                self.attn_backend = FlashAttentionBackend(
+                    self,
+                    num_draft_tokens=self.server_args.speculative_num_draft_tokens,
+                    skip_prefill=True,
+                )
+            else:
+                self.attn_backend = FlashAttentionBackend(self)
         else:
             raise ValueError(
                 f"Invalid attention backend: {self.server_args.attention_backend}"

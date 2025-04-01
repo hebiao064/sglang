@@ -48,6 +48,7 @@ class FlashAttentionBackend(AttentionBackend):
         topk=0,
         speculative_num_steps=0,
         step_id=0,
+        num_draft_tokens=0,
     ):
         super().__init__()
 
@@ -61,6 +62,7 @@ class FlashAttentionBackend(AttentionBackend):
         self.max_context_len = model_runner.model_config.context_len
         self.device = model_runner.device
         self.decode_cuda_graph_metadata = {}
+        self.target_verify_metadata = {}
         self.req_to_token = model_runner.req_to_token_pool.req_to_token
         self.page_size = model_runner.page_size
         self.use_mla = (
@@ -70,6 +72,7 @@ class FlashAttentionBackend(AttentionBackend):
         self.topk = topk
         self.speculative_num_steps = speculative_num_steps
         self.step_id = step_id
+        self.num_draft_tokens = num_draft_tokens
 
     def init_forward_metadata(self, forward_batch: ForwardBatch):
         """Initialize forward metadata to cache repetitive calculations."""
@@ -122,8 +125,10 @@ class FlashAttentionBackend(AttentionBackend):
                     ] = cache_loc[
                         real_bsz_start_idx:real_bsz_end_idx, : (self.step_id + 1)
                     ]
+                
                 print(metadata)
             else:
+                print(f"forward batch is {forward_batch}")
                 metadata.cache_seqlens_int32 = seqlens_in_batch.to(torch.int32)
                 metadata.cu_seqlens_k = torch.nn.functional.pad(
                     torch.cumsum(seqlens_in_batch, dim=0, dtype=torch.int32), (1, 0)
@@ -163,6 +168,8 @@ class FlashAttentionBackend(AttentionBackend):
             aug_cum_len = torch.nn.functional.pad(
                 torch.cumsum(aug_seq_lens, dim=0, dtype=torch.int32), (1, 0)
             )
+
+            torch.distributed.breakpoint()
             for idx, single_seq_len in enumerate(aug_seq_lens):
                 metadata.page_table[
                     idx * draft_token_num : (idx + 1) * draft_token_num, :single_seq_len
@@ -173,7 +180,7 @@ class FlashAttentionBackend(AttentionBackend):
                 ].view(
                     draft_token_num, -1
                 )
-
+            # torch.distributed.breakpoint()
             metadata.max_seq_len_q = 1
             print(metadata)
         else: # Normal Extend / Draft Extend
@@ -467,10 +474,12 @@ class FlashAttentionBackend(AttentionBackend):
                 0, self.max_context_len, self.page_size, device=self.device
             ),
         }
+        
+        print(f"num_draft_tokens: {self.num_draft_tokens}")
 
         self.target_verify_metadata = {
             "page_table": torch.zeros(
-                max_bs * 8,
+                max_bs * self.num_draft_tokens,
                 (self.max_context_len + self.page_size - 1) // self.page_size,
                 dtype=torch.int32,
                 device=self.device,
@@ -518,7 +527,7 @@ class FlashAttentionBackend(AttentionBackend):
             metadata.cu_seqlens_q = torch.arange(
                 0, bs * draft_token_num + 1, dtype=torch.int32, device=device
             )
-
+            print(f"seq_lens during capture: {seq_lens}")
             aug_seq_lens = (seq_lens + draft_token_num).to(torch.int32)
             metadata.cache_seqlens_int32 = aug_seq_lens.repeat_interleave(
                 spec_info.draft_token_num
@@ -594,8 +603,9 @@ class FlashAttentionBackend(AttentionBackend):
         metadata = self.decode_cuda_graph_metadata[bs]
         device = seq_lens.device
         if draft_decode:
+
             print(f"Replay step_id: {self.step_id}")
-            # torch.distributed.breakpoint()
+            torch.distributed.breakpoint()
             max_len = seq_lens_cpu[:bs].max().item()
             metadata.max_seq_len_k = max_len + (
                 self.step_id + 1
@@ -632,6 +642,7 @@ class FlashAttentionBackend(AttentionBackend):
                 ]
             print(metadata)
         elif forward_mode.is_target_verify():
+            print(f"forward batch is {seq_lens}")
             metadata = self.target_verify_metadata[bs]
             draft_token_num = spec_info.draft_token_num
 
