@@ -453,7 +453,11 @@ class FlashAttentionBackend(AttentionBackend):
         This creates fixed-size tensors that will be reused during CUDA graph replay
         to avoid memory allocations.
         """
-        # Initialize fixed size tensors for decode operations
+        if self.speculative_num_steps > 0:
+            raise NotImplementedError(
+                "FlashAttentionBackend Spec Decoding does not support CUDA graph yet, stay tuned!"
+            )
+
         self.decode_cuda_graph_metadata = {
             # Page table for token mapping (batch_size, max_context_len)
             "page_table": torch.zeros(
