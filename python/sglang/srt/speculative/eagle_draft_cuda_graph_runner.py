@@ -144,7 +144,8 @@ class EAGLEDraftCudaGraphRunner:
 
         # Attention backend
         self.model_runner.draft_attn_backend.init_forward_metadata_capture_cuda_graph(
-            forward_batch
+            forward_batch,
+            draft_decode=True,
         )
 
         # Run and capture
