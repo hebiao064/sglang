@@ -404,6 +404,10 @@ class EAGLEWorker(TpModelWorker):
             )
             # Run forward steps
             score_list, token_list, parents_list = self.draft_forward(forward_batch)
+        print(f"Can Cuda Graph: {can_cuda_graph}")
+        print(f"score_list: {score_list}")
+        print(f"token_list: {token_list}")
+        print(f"parents_list: {parents_list}")
 
         self.token_to_kv_pool_allocator.restore_state(token_to_kv_pool_state_backup)
 

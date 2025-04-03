@@ -100,7 +100,7 @@ class ForwardMode(IntEnum):
     def is_cuda_graph(self):
         return (
             self == ForwardMode.DECODE
-            or self == ForwardMode.TARGET_VERIFY
+            # or self == ForwardMode.TARGET_VERIFY
             or self == ForwardMode.IDLE
         )
 
