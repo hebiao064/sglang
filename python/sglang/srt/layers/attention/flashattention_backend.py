@@ -454,8 +454,8 @@ class FlashAttentionBackend(AttentionBackend):
         to avoid memory allocations.
         """
         if self.speculative_num_steps > 0:
-            raise NotImplementedError(
-                "FlashAttentionBackend Spec Decoding does not support CUDA graph yet, stay tuned!"
+            print(
+                "Warning: FlashAttentionBackend Spec Decoding does not support CUDA graph yet, stay tuned!"
             )
 
         self.decode_cuda_graph_metadata = {
