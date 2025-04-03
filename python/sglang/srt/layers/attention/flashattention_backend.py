@@ -82,6 +82,8 @@ class FlashAttentionBackend(AttentionBackend):
         batch_size = len(seqlens_in_batch)
         device = seqlens_in_batch.device
 
+        print(f"forward_batch.forward_mode: {forward_batch.forward_mode}")
+        print(f"forward_batch seq_lens: {forward_batch.seq_lens_cpu}")
         if forward_batch.forward_mode == ForwardMode.DECODE:
             if self.skip_prefill:
                 metadata.cu_seqlens_q = torch.arange(
