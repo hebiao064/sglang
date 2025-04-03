@@ -82,6 +82,9 @@ class ForwardMode(IntEnum):
             or self == self.TARGET_VERIFY
         )
 
+    def is_extend_or_draft_extend(self):
+        return self == ForwardMode.EXTEND or self == ForwardMode.DRAFT_EXTEND
+
     def is_decode(self):
         return self == ForwardMode.DECODE
 

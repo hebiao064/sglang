@@ -144,8 +144,7 @@ class EAGLEDraftCudaGraphRunner:
 
         # Attention backend
         self.model_runner.draft_attn_backend.init_forward_metadata_capture_cuda_graph(
-            forward_batch,
-            draft_decode=True,
+            forward_batch
         )
 
         # Run and capture
@@ -221,7 +220,7 @@ class EAGLEDraftCudaGraphRunner:
             forward_batch.seq_lens_cpu = self.seq_lens_cpu[:bs]
 
         self.model_runner.draft_attn_backend.init_forward_metadata_replay_cuda_graph(
-            forward_batch, bs, draft_decode=True
+            forward_batch, bs
         )
 
         # Replay
