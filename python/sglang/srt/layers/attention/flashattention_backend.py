@@ -101,7 +101,7 @@ class FlashAttentionBackend(AttentionBackend):
         if forward_batch.forward_mode.is_decode():
             # Skip Prefill or Draft Decode
             # Note: Draft Decode will be ran on the Draft Worker
-            if self.skip_prefill or self.speculative_num_steps > 0:
+            if forward_batch.spec_info is not None and isinstance(forward_batch.spec_info, EagleDraftInput):
                 # Biao's note: Should we remove skip_prefill entirely from this file?
                 metadata.cu_seqlens_q = torch.arange(
                     0, batch_size * self.topk + 1, dtype=torch.int32, device=device
@@ -189,7 +189,7 @@ class FlashAttentionBackend(AttentionBackend):
                     draft_token_num, -1
                 )
             metadata.max_seq_len_q = 1
-            print("target verify no cuda graph", metadata)
+            # print("target verify no cuda graph", metadata)
         elif forward_batch.forward_mode.is_extend_or_draft_extend():
             # Normal or Draft Extend (Both of them will be ran on the Target Worker)
             metadata.cache_seqlens_int32 = seqlens_in_batch.to(torch.int32)
@@ -498,7 +498,7 @@ class FlashAttentionBackend(AttentionBackend):
         metadata = FlashAttentionMetadata()
         device = seq_lens.device
         if forward_mode.is_decode():
-            if spec_info is not None:
+            if spec_info is not None and isinstance(spec_info, EagleDraftInput):
                 # Draft Decode
                 seq_lens_with_decode = seq_lens + (self.step_id + 1)
                 metadata.cu_seqlens_q = torch.arange(
@@ -585,10 +585,10 @@ class FlashAttentionBackend(AttentionBackend):
         seq_lens = seq_lens[:bs]
         req_pool_indices = req_pool_indices[:bs]
         seq_lens_cpu = seq_lens_cpu[:bs]
-        print(f"forward_mode is {forward_mode}")
+        # print(f"forward_mode is {forward_mode}")
         if forward_mode.is_decode():
             metadata = self.decode_cuda_graph_metadata[bs]
-            if spec_info is not None:
+            if spec_info is not None and isinstance(spec_info, EagleDraftInput):
                 # Draft Decode
                 max_len = seq_lens_cpu.max().item()
                 metadata.max_seq_len_k = max_len + (self.step_id + 1)
@@ -635,8 +635,8 @@ class FlashAttentionBackend(AttentionBackend):
                 # metadata.page_table[cache_loc.shape[0]:, :1].fill_(1)
                 # print("(page_table != 0).sum(-1)", (page_table != 0).sum(-1))
                 # print("seq_lens_with_decode", seq_lens_with_decode)
-                print("cuda graph draft decode", metadata)
-                print("cuda graph draft decode", metadata.page_table[:, :40])
+                # print("cuda graph draft decode", metadata)
+                # print("cuda graph draft decode", metadata.page_table[:, :40])
             else:
                 # Normal Decode
                 max_len = seq_lens_cpu.max().item()
@@ -699,8 +699,8 @@ class FlashAttentionBackend(AttentionBackend):
             metadata.page_table[spec_info.positions.shape[0] :, :].fill_(0)
 
             metadata.max_seq_len_q = 1
-            print("cuda graph verify", metadata)
-            print("cuda graph verify", metadata.page_table[:, :40])
+            # print("cuda graph verify", metadata)
+            # print("cuda graph verify", metadata.page_table[:, :40])
 
         self.forward_metadata = metadata
 
