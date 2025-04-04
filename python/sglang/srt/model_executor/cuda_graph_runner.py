@@ -469,7 +469,6 @@ class CudaGraphRunner:
 
     def replay_prepare(self, forward_batch: ForwardBatch):
         self.recapture_if_needed(forward_batch)
-
         raw_bs = forward_batch.batch_size
         raw_num_token = raw_bs * self.num_tokens_per_bs
 
@@ -505,7 +504,6 @@ class CudaGraphRunner:
 
         if hasattr(forward_batch.spec_info, "hidden_states"):
             self.hidden_states[:raw_num_token] = forward_batch.spec_info.hidden_states
-
         # Attention backend
         self.model_runner.attn_backend.init_forward_metadata_replay_cuda_graph(
             bs,

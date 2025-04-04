@@ -1069,6 +1069,8 @@ class FlashInferMultiStepDraftBackend:
                 seq_lens_cpu=None,
             )
 
+        print(f"FlashInfer kv_indices: {self.cuda_graph_kv_indices[:, :20]}")
+        print(f"FlashInfer kv_indptr: {self.kv_indptr[:, :100]}")
         self.common_template(forward_batch, self.cuda_graph_kv_indices, call_fn)
 
 
